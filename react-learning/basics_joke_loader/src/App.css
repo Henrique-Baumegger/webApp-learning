@@ -1,0 +1,77 @@
+/*
+App.css is scoped to the App component specifically
+*/
+
+
+/* ─── APP COMPONENT STYLES ─────────────────────────────────────────────────
+   App.css styles the specific components inside App.
+   We use simple selectors here: element names, classes would be better in real projects, but this keeps things clear for learning.
+*/
+
+/* ── The wrapper div inside App ──────────────────────────────────────────── */
+/* Centers content and gives it a max width so it doesn't stretch forever */
+div {
+  max-width: 600px;
+  margin: 0 auto;          /* auto left+right margin = horizontally centered */
+}
+
+/* ── The greeting paragraph from <Hello /> ───────────────────────────────── */
+p {
+  font-size: 1.4rem;       /* rem = relative to root font size, scales well */
+  text-align: center;
+  padding: 20px;
+  margin-bottom: 30px;
+
+  /* A subtle border to frame it like a scroll header */
+  border-top: 2px solid #8b6914;
+  border-bottom: 2px solid #8b6914;
+}
+
+/* ── The "Add joke" button ───────────────────────────────────────────────── */
+button {
+  display: block;           /* block = takes full width of parent */
+  margin: 0 auto 20px auto; /* centered, with space below */
+  padding: 12px 30px;
+
+  /* Dark button with gold text */
+  background-color: #2a1f14;
+  color: #c9a84c;
+  border: 2px solid #8b6914;
+
+  /* Inherit the medieval font from body (buttons don't do this by default!) */
+  font-family: inherit;
+  font-size: 1.1rem;
+
+  /* Rounded corners — just a little, keeps it medieval-ish */
+  border-radius: 4px;
+
+  /* Pointer cursor so it feels clickable */
+  cursor: pointer;
+}
+
+/* :hover = when the mouse is over the button */
+button:hover {
+  background-color: #3d2e1c;
+  border-color: #c9a84c;
+}
+
+/* ── The joke list ───────────────────────────────────────────────────────── */
+ul {
+  list-style: none;         /* removes the default bullet points */
+  padding: 0;
+}
+
+li {
+  padding: 14px 18px;
+  margin-bottom: 10px;
+
+  /* Slightly lighter than the page background — creates depth */
+  background-color: #241c14;
+
+  /* Left border acts as a decorative accent, like a gilded edge */
+  border-left: 3px solid #8b6914;
+
+  border-radius: 3px;
+  font-size: 1rem;
+  line-height: 1.5;        /* space between lines — improves readability */
+}

@@ -1,0 +1,87 @@
+body {
+  background-color: #000080;
+  font-family: "Comic Sans MS", "Courier New", monospace;
+  color: #ffff00;
+  margin: 0;
+  padding: 16px;
+}
+
+h1 {
+  color: #ff00ff;
+  text-shadow: 3px 3px #00ffff;
+  font-size: 2.5rem;
+  text-align: center;
+  border-bottom: 4px dashed #ff0000;
+  padding-bottom: 8px;
+}
+
+button {
+  background-color: #ff0000;
+  color: #ffffff;
+  font-family: "Comic Sans MS", monospace;
+  font-size: 1rem;
+  font-weight: bold;
+  border: 4px outset #ffff00;
+  padding: 8px 16px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  display: block;
+  margin: 16px auto;
+}
+
+button:hover {
+  background-color: #ffff00;
+  color: #000000;
+  border-style: inset;
+}
+
+input {
+  background-color: #ffffff;
+  color: #000000;
+  font-family: "Comic Sans MS", monospace;
+  font-size: 1rem;
+  border: 4px inset #00ffff;
+  padding: 6px 10px;
+  width: 100%;
+  max-width: 400px;
+  display: block;
+  margin: 12px auto;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+li {
+  flex: 1 1 200px;
+  max-width: 260px;
+}
+
+/* CourseCard */
+li > div {
+  background-color: #008000;
+  border: 4px outset #00ff00;
+  padding: 12px;
+  text-align: center;
+}
+
+li > div h1 {
+  font-size: 1.2rem;
+  color: #00ffff;
+  text-shadow: 2px 2px #ff00ff;
+  border-bottom: 2px dashed #ffff00;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+li > div p {
+  color: #ffffff;
+  font-size: 0.9rem;
+}

@@ -1,0 +1,32 @@
+/* ─── GLOBAL STYLES ────────────────────────────────────────────────────────
+   index.css sets the base look for the entire page.
+   Think of it as the "foundation" — fonts, background, text color.
+   These apply to every element unless overridden.
+*/
+
+/* Import a medieval-looking font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap');
+
+/* Reset default browser spacing so everything starts clean */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;  /* makes width/height include padding+border */
+}
+
+body {
+  /* Dark background like a castle interior */
+  background-color: #1a1410;
+
+  /* Warm off-white text — easier on the eyes than pure white */
+  color: #d4c4a0;
+
+  /* Use our medieval font, fall back to serif if it fails to load */
+  font-family: 'MedievalSharp', serif;
+
+  /* A bit of breathing room around the edges */
+  padding: 40px;
+
+  /* Minimum height = full screen, so background covers everything */
+  min-height: 100vh;
+}

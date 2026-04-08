@@ -1,0 +1,68 @@
+/*
+    CSS rules follow this structure:
+
+    selector {
+        property: value;
+    }
+
+    The selector targets which HTML elements to style.
+    Common selector types:
+        p           — targets all <p> elements (by tag)
+        .my-class   — targets all elements with class="my-class" (by class)
+        p.my-class  — targets only <p> elements that also have class="my-class"
+        #my-id      — targets the element with id="my-id" (should be unique per page)
+    Full reference: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_selectors
+
+    Such selectors are also used at Document.querySelector() in JS
+
+*/
+
+
+body {
+    /* Targets the <body> element.
+       Many CSS properties are *inherited* — child elements automatically receive
+       the same value unless they override it. color and font-family inherit.
+       margin and max-width do NOT inherit — they only affect <body> itself. */
+
+    color: blueviolet;
+    /* Inherited by all children — sets the default text color for the whole page. */
+
+    font-family: sans-serif;
+    /* Inherited. "sans-serif" is a generic family — the browser picks its default
+       sans-serif font (usually Arial or Helvetica). In real projects you would
+       specify an actual font, e.g. font-family: "Inter", sans-serif;
+       The fallback after the comma is used if the first font fails to load. */
+
+    max-width: 600px;
+    /* NOT inherited. Limits this element's width to 600px.
+       Without this, <body> would stretch to fill the entire browser window.
+       "max" means it can be narrower (e.g. on mobile), but never wider. */
+
+    margin: 0 auto 0 auto; /* top right bottom left */
+    /* Shorthand for setting all four sides: top right bottom left (clockwise).
+       0        — no top or bottom margin.
+       auto     — left and right margins are calculated automatically.
+       When left AND right are both auto, the browser distributes remaining space
+       equally on both sides — centering the element horizontally.
+       This only works because max-width is set. Without it, <body> is already
+       full-width and there is no remaining space for auto to distribute. */
+}
+
+
+/*
+    THE CSS BOX MODEL
+    Every element is a rectangular box made of four layers (outside to inside):
+
+    margin  — space outside the border. Transparent, never colored.
+              Pushes neighboring elements away.
+
+    border  — the visible edge. Has thickness, color, and style.
+
+    padding — space between the border and the content.
+              Inherits the element's background color (feels like part of the element).
+              
+    content — the actual text, images, or child elements.
+
+    Visual reference: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_box_model
+*/
+

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!-- DOCTYPE sets rendering mode -->
+
+<html lang ="en">
+    
+    <head>
+
+        <!-- 
+            <link> describes a relationship between this document and an external resource.
+            rel="stylesheet" tells the browser: "this is a CSS file — fetch it and apply its rules."
+            href is just the file path. The browser makes a separate HTTP request for it.
+        -->
+        <link rel="stylesheet" href="stylesheet.css">
+
+        <!-- meta tags are metadata — information about the page, not displayed content -->
+        <meta charset = "UTF-8">
+
+        <!-- <title> appears in the browser tab -->
+        <title>My first page </title>
+
+        <script src="app.js" defer="true"></script>
+
+    </head>
+
+    
+    <body>
+
+        <h1>Le jonk</h1>
+
+        <!-- 
+        Whitespace (spaces, newlines, indentation) inside HTML is collapsed to a single space by the browser.
+        These two lines render as a single paragraph. 
+        -->
+        <p> 
+            Society decides 
+            what is funny and what is not
+        </p>
+
+        <p> This may be funny for you:</p>
+        
+        <ul>
+            <!--
+            <ul> = unordered list. <ol> would be an ordered (numbered) list.
+            <li> = list item. Must be a direct child of <ul> or <ol>
+                 -->
+            <li>    
+            <a href="https://www.youtube.com/watch?v=zAGVQLHvwOY">Society trailer</a>
+            </li>
+
+            <li>    
+            <a href="https://www.youtube.com/watch?v=_OKAwz2MsJs">Society 2 trailer</a>
+            </li>
+
+        </ul>
+        
+        <!--
+        A void element is an element in HTML that cannot have any child nodes (i.e., nested elements or text nodes). 
+        Void elements only have a start tag; end tags must not be specified for void elements. 
+        <img> is a void element 
+        -->
+        <img
+        src="images\society_image.jpg"
+        alt="Deep image about society"
+        />
+
+        <br />
+
+        <button id="fetch-btn">Load a joke</button>
+        <ul id="joke-output-list">
+            <!--
+            We will instantiate children of this component. They will be <li>
+            -->
+        </ul>
+        
+
+    </body>
+
+</html>
+
+
+<!--
+For header, main, footer, scrool bar and overall website desgin structure:
+    - https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Structuring_content/Structuring_documents
+-->
