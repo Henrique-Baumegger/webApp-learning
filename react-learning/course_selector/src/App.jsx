@@ -57,10 +57,13 @@ function Filter({searchQuery, setSearchQuery}) {
 
   return (
     <input 
-        value={searchQuery}           // React controls what's displayed
-        onChange={(e) => setSearchQuery(e.target.value)}  // user typing updates state → re-render → input updates
+        value={searchQuery} // React controls what's displayed. Now if we alter searchQuery, this input field will also be altered
+        // Without value: React knows the data, DOM shows the text. Two sources of truth. With value: React controls both. One source of truth.
+
+        onChange={(e) => setSearchQuery(e.target.value)} // Fires immediately when the input’s value is changed by the user (for example, it fires on every keystroke)
     />
   )
+  // Reminder: HTML events are all lower case (onchange, onclick), while react synthetic events use camelCase (onChange, onClick)
 }
 
 
