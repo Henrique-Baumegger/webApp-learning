@@ -1,4 +1,4 @@
-'use client'; // Because we need to usePathname
+'use client'; // Because we need to usePathname()
 
 
 import {
