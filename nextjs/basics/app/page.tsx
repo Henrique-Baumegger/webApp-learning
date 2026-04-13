@@ -5,6 +5,15 @@ import Link from 'next/link'
 // Server component by default — renders on the server, sends finished HTML to browser.
 // No useState, no onClick — the server has no browser.
 
+
+// Server component  →  data fetching, static content, navigation. Enabled by default
+// Client component  →  useState, events, anything the user interacts with. Enabled with 'use client'
+// layout.tsx        →  persistent shell (navbar, footer)
+// page.tsx          →  what renders at this route
+// [param]/          →  dynamic routes, value available via params
+// _folder/          →  not a route, just organization
+
+
 export default function Home() {
   return (
   <div>
@@ -24,10 +33,3 @@ export default function Home() {
   </div>
   )
 }
-
-// Server component  →  data fetching, static content, navigation
-// Client component  →  useState, events, anything the user interacts with
-// layout.tsx        →  persistent shell (navbar, footer)
-// page.tsx          →  what renders at this route
-// [param]/          →  dynamic routes, value available via params
-// _folder/          →  not a route, just organization
