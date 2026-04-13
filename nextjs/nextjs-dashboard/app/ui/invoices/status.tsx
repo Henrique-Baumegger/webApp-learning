@@ -2,9 +2,10 @@ import { CheckIcon, ClockIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
 export default function InvoiceStatus({ status }: { status: string }) {
+  // "clsx" applies styling conditionaly (based on "states" prop here)
   return (
     <span
-      className={clsx(
+      className={clsx( 
         'inline-flex items-center rounded-full px-2 py-1 text-xs',
         {
           'bg-gray-100 text-gray-500': status === 'pending',
