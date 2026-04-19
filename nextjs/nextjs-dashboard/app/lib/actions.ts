@@ -83,12 +83,19 @@ export async function createInvoice(prevState: State, formData: FormData) {
   const date = new Date().toISOString().split('T')[0];
 
 
+  try {
+
   // Basic way to use SQL
   await sql`
     INSERT INTO invoices (customer_id, amount, status, date)
     VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
   `;
-
+  } catch (error) {
+    console.error(error);
+    return {
+      message: 'Database Error: Failed to Create Invoice.',
+    };
+  }
 
   // Once the database has been updated, the /dashboard/invoices path will be revalidated, 
   // and fresh data will be fetched from the server.
@@ -107,11 +114,10 @@ export async function createInvoice(prevState: State, formData: FormData) {
 
 
 
+const UpdateInvoice = FormSchema.omit({ id: true, date: true });
 
 
 // Use Zod to update the expected types
-const UpdateInvoice = FormSchema.omit({ id: true, date: true });
- 
 export async function updateInvoice(id: string, formData: FormData) {
   const { customerId, amount, status } = UpdateInvoice.parse({
     customerId: formData.get('customerId'),
@@ -121,11 +127,17 @@ export async function updateInvoice(id: string, formData: FormData) {
  
   const amountInCents = amount * 100;
  
-  await sql`
-    UPDATE invoices
-    SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
-    WHERE id = ${id}
-  `;
+  try {
+    await sql`
+        UPDATE invoices
+        SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
+        WHERE id = ${id}
+      `;
+  } catch (error) {
+    // We'll also log the error to the console for now
+    console.error(error);
+    return { message: 'Database Error: Failed to Update Invoice.' };
+  }
  
   revalidatePath('/dashboard/invoices');
   redirect('/dashboard/invoices');
