@@ -346,7 +346,58 @@ Two important properties fall out of "it's secretly a POST endpoint":
 
 Server Actions can be imported by **both Client and Server Components**. Convention is to keep them in a dedicated file (`app/lib/actions.ts`) rather than inline inside a Server Component — easier to find, easier to share, easier to audit.
 
-⚠️ Because they mutate, almost always pair with `revalidatePath`/`revalidateTag` (§30) to invalidate the cached page showing the mutated data, and optionally `redirect()` (§32) on success.
+**Not just for forms — Server Actions are typed RPC.** The `<form action={...}>` pattern is the most famous use, but the real story is: *any* server-side function can be imported and called from client code, with a typed return value, just like a local async function. No form required.
+
+```ts
+// app/lib/actions.ts
+'use server';
+
+export async function deleteInvoice(id: string) {
+  await sql`DELETE FROM invoices WHERE id = ${id}`;
+  revalidatePath('/dashboard/invoices');
+}
+
+export async function toggleFavorite(invoiceId: string) {
+  const session = await auth();                          // read session server-side
+  await sql`INSERT INTO favorites (user_id, invoice_id)  -- write DB
+            VALUES (${session.user.id}, ${invoiceId})
+            ON CONFLICT DO NOTHING`;
+}
+
+export async function generateInvoicePDF(id: string): Promise<{ url: string }> {
+  const invoice = await sql`SELECT * FROM invoices WHERE id = ${id}`;
+  const pdf = await renderPDF(invoice);                  // CPU work, server-side libs
+  const url = await uploadToS3(pdf);                     // external API with secret creds
+  return { url };                                        // typed return, travels back to caller
+}
+```
+
+```tsx
+// a plain Client Component calling them from event handlers — no <form> in sight
+'use client';
+import { deleteInvoice, toggleFavorite, generateInvoicePDF } from '@/app/lib/actions';
+
+export function InvoiceActions({ id }: { id: string }) {
+  return (
+    <div>
+      <button onClick={() => toggleFavorite(id)}>⭐ Favorite</button>
+      <button onClick={() => deleteInvoice(id)}>Delete</button>
+      <button onClick={async () => {
+        const { url } = await generateInvoicePDF(id);    // awaits the typed server result
+        window.open(url);
+      }}>
+        Download PDF
+      </button>
+    </div>
+  );
+}
+```
+
+Notice what's happening: the browser is calling `deleteInvoice`, `toggleFavorite`, `generateInvoicePDF` as if they were local async functions, and getting back typed results. Behind the scenes they're POST requests — but you never write URLs, never parse JSON, never declare request/response schemas, never keep the client and server types in sync. Anything the server can do (DB writes, external APIs with secret keys, file generation, session reads, cache invalidation, sending emails) becomes a typed async function the browser can `await`. **That's what the `'use client' shenanigans but on the server` line means.**
+
+⚠️ Because Server Actions often mutate, almost always pair with `revalidatePath`/`revalidateTag` (§30) to invalidate the cached page showing the mutated data, and optionally `redirect()` (§32) on success.
+
+⚠️ **They still run over the network.** A Server Action call from the browser is still a POST request — assume latency, handle loading/error UI (`useActionState`'s `pending` flag, §33, or a local `useTransition`). And never trust client-passed args: validate inside the action (§31) just like you would an API endpoint, because under the hood that's exactly what it is.
 
 ### §29.5 `.bind()` — passing extra args to a Server Action
 Server Actions receive `FormData` implicitly from `<form action={...}>`. To pass *additional* values (like the `id` of the record being edited), use `.bind(null, value)` to pre-fill the first parameter:
