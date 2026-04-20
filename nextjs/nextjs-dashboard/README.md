@@ -27,7 +27,7 @@
 §18 Server vs Client Components · §19 What you can't do in Server Components · §20 Cost of `'use client'` · §21 Static vs Dynamic Rendering · §22 Partial Prerendering · §23 Streaming & Suspense · §24 Skeletons · §25 Scoping `loading.tsx`
 
 **Part 4 — Data & Mutations**
-§26 Fetching in Server Components · §27 Postgres on Vercel · §28 Waterfalls vs parallel fetches · §29 Server Actions · §30 `revalidatePath` / `revalidateTag` · §31 Zod validation · §32 `redirect` · §33 `useActionState` · §34 Progressive enhancement
+§26 Fetching in Server Components · §27 Postgres on Vercel · §28 Waterfalls vs parallel fetches · §28.5 Move fetches down to components · §29 Server Actions · §30 `revalidatePath` / `revalidateTag` · §31 Zod validation · §32 `redirect` · §33 `useActionState` & form-wiring patterns · §34 Progressive enhancement
 
 **Part 5 — Search, URL State & UX**
 §35 URL search params as state · §36 Debouncing · §37 Pagination
@@ -62,6 +62,16 @@ React is a UI library; Next.js is a full-stack React framework on top of it. It 
 
 ### §5 TypeScript
 Built-in. `tsconfig.json` is preconfigured.
+
+**Three ways to attach a type to a value** — the difference matters, and you'll see all three in Next.js config files:
+
+```ts
+const x: MyType = value;           // annotation: checks value, but widens it to MyType (loses literal info)
+const x = value as MyType;         // assertion: "trust me, it's MyType" — weaker checking, can hide bugs
+const x = value satisfies MyType;  // checks value AND preserves the narrow/literal type (best of both)
+```
+
+Prefer `satisfies` for config objects where you want both the type-check *and* the precise shape preserved for downstream inference (e.g. `NextAuthConfig`, route objects, theme tokens). Reach for `as` only when you genuinely know something the compiler doesn't — it's an escape hatch, not a tool.
 
 ### §6 Tailwind CSS
 Utility-first: `className="flex items-center gap-2 rounded-md bg-sky-500"`. No context-switch to a `.css` file, but strings get long — mitigate with `clsx` (§8) and extracting components early.
@@ -103,10 +113,35 @@ Layouts nest by folder. `app/layout.tsx` wraps everything; `app/dashboard/layout
 `app/layout.tsx` is the single layout every page inherits. It's the only place `<html>` and `<body>` tags live, and where global fonts (§39) and global CSS are attached.
 
 ### §13 Dynamic routes
-`app/invoices/[id]/page.tsx` matches `/invoices/123` and receives `params: { id: string }`. `[...slug]` = catch-all; `[[...slug]]` = optional catch-all.
+A folder named `[id]` means "anything in this URL segment is captured and passed to the page as a parameter":
+
+```tsx
+// app/invoices/[id]/page.tsx — matches /invoices/123, /invoices/abc, etc.
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;   // ⚠️ Next 15: params is a Promise — must be awaited
+  const invoice = await fetchInvoiceById(id);
+  return <Edit invoice={invoice} />;
+}
+```
+
+`[...slug]` = catch-all (matches `/a/b/c` as `slug: ['a','b','c']`). `[[...slug]]` = optional catch-all (also matches the empty segment).
 
 ### §14 Route groups
-`(folder)` groups without adding to the URL.
+A folder in parentheses `(folder)` organizes files without contributing to the URL:
+
+```
+app/
+  (marketing)/
+    about/page.tsx      → /about
+  (shop)/
+    cart/page.tsx       → /cart
+  dashboard/
+    (overview)/
+      page.tsx          → /dashboard
+      loading.tsx       → only scopes the skeleton to /dashboard, not its children
+```
+
+Two uses: (a) segment the app into sections with their own layouts/loading without affecting URLs, (b) scope a special file (like `loading.tsx`) to exactly one page among siblings.
 
 ### §15 `<Link>`
 From `next/link`. Client-side navigation (no full reload) + automatic prefetching of links in the viewport. Most of the "feels like an SPA" experience comes from just using it instead of `<a>`.
@@ -115,7 +150,15 @@ From `next/link`. Client-side navigation (no full reload) + automatic prefetchin
 From `next/navigation`. Returns the current URL path — used to highlight active nav links. Client-only.
 
 ### §17 `useRouter()`
-Programmatic client-side navigation.
+Programmatic client-side navigation from `next/navigation` (client-only).
+
+```ts
+const router = useRouter();
+router.push('/dashboard');            // adds a history entry (back button returns here)
+router.replace(`?query=${value}`);    // replaces current entry — right choice for URL-as-state (§35)
+```
+
+Use `replace` when the change is "updating the current view" (search, filter, tab); use `push` when it's "going somewhere new".
 
 ---
 
@@ -127,6 +170,11 @@ Programmatic client-side navigation.
 You opt a component into the browser by adding `'use client'` at the top of its file. From that file *and everything it imports*, you get browser APIs, event handlers (`onClick`, `onChange`), and React state/effect hooks — the "traditional" React experience.
 
 **Mental model:** Server Components for fetching data and rendering structure; Client Components for interactivity. A typical page is a Server Component that fetches data and passes it to a small Client Component for the interactive pieces (search input, dropdown, chart). No API layer is needed between them — the Server Component talks to the DB directly, because it *is* the backend.
+
+**Lifetime framing that made this click:**
+- Server Component code **runs once**, on the server, during the render for that request. The browser never sees it run again — it just receives the output HTML.
+- Client Component code (`'use client'`) also runs during that initial render (to produce HTML), but then **keeps running in the browser** — that's what enables `onClick`, `useState`, `useEffect`, everything interactive.
+- Server Actions (`'use server'`, §29) are the other direction: "give me `'use client'` ergonomics — call a function from an event handler — but have the function actually execute on the server." Under the hood it's a hidden POST endpoint.
 
 **Composition rule:** a Server Component can import a Client Component (fine), but a Client Component can't import a Server Component directly — it can only receive one via the `children` prop. That's why you often see structures like `<ClientShell>{serverChildren}</ClientShell>`.
 
@@ -196,6 +244,37 @@ const [a, b] = await Promise.all([fetchA(), fetchB()]);
 
 Parallelism is often the single biggest performance win on a dashboard, because most queries are independent. Keep the sequential form **only** when a later fetch genuinely needs the earlier one's result.
 
+### §28.5 Move fetches *down* into the components that need them
+Related but distinct from §28. A traditional React instinct is to fetch all data at the top (page or route-level loader) and pass it down as props. In Server Components, the opposite is often better: **the component that renders the data does the fetch**.
+
+```tsx
+// ❌ Page fetches everything up front — can't stream, must block on slowest query
+async function Page() {
+  const [revenue, latest, cards] = await Promise.all([fetchRevenue(), fetchLatest(), fetchCards()]);
+  return (
+    <>
+      <Cards data={cards} />
+      <RevenueChart data={revenue} />
+      <LatestInvoices data={latest} />
+    </>
+  );
+}
+
+// ✅ Each component fetches its own data — wrap in <Suspense> to stream independently
+async function Page() {
+  return (
+    <>
+      <Suspense fallback={<CardsSkeleton />}><Cards /></Suspense>
+      <Suspense fallback={<ChartSkeleton />}><RevenueChart /></Suspense>
+      <Suspense fallback={<InvoicesSkeleton />}><LatestInvoices /></Suspense>
+    </>
+  );
+}
+// where e.g. async function Cards() { const data = await fetchCards(); ... }
+```
+
+Benefits: each boundary streams in as its own data resolves (§23), slow queries don't hold up fast ones, and the data requirement lives next to the UI that uses it. This composes with `Promise.all` — use it *inside* a component when that component needs multiple independent things.
+
 ### §29 Server Actions
 Server Actions are async functions marked `'use server'` that run on the server but can be called directly from forms or Client Components — **no `/api` route, no client-side `fetch`**:
 
@@ -215,6 +294,8 @@ export async function createInvoice(formData: FormData) {
 <form action={createInvoice}> ... </form>
 ```
 
+⚠️ **The HTML `action` attribute normally takes a URL string.** When you pass a *function* to it, that's React overloading the attribute — the name collision with "Server Actions" is a coincidence. React sees the function, builds `FormData` from the form on submit, and calls it. That's the whole trick.
+
 Under the hood, Next.js creates a POST endpoint, handles CSRF, and invokes the function. Because it's "just a function," it composes naturally with validation (§31), auth, and rollbacks — write it the way you'd write any server function.
 
 Two important properties fall out of this design:
@@ -233,8 +314,39 @@ Schema library used inside Server Actions to parse + validate `FormData` before 
 ### §32 `redirect`
 `redirect('/url')` from `next/navigation` — works from Server Components and Server Actions.
 
-### §33 `useActionState`
-Client hook that wraps a Server Action and exposes the action's previous return value (typically validation errors) plus a `pending` flag for spinners. Lets the form show inline errors without the action having to throw.
+### §33 `useActionState` — and the two ways to wire a form to a Server Action
+There are exactly two patterns. Pick based on whether you care about the action's return value.
+
+**(A) Fire-and-forget** — `<form action={serverAction}>`. React builds `FormData`, calls the action, done. The action's return value is **discarded**. Use when the action always redirects or has nothing to report back (e.g. "delete invoice", "sign out").
+
+```tsx
+<form action={deleteInvoice}>
+  <button type="submit">Delete</button>
+</form>
+```
+
+**(B) Capture the return** — `useActionState(serverAction, initialState)`. Wraps the action so its return value becomes `state` on the client, triggering a re-render. Use when the action can fail validation or needs to reply with data (error messages, success text).
+
+```tsx
+'use client';
+import { useActionState } from 'react';
+import { createInvoice, type State } from '@/app/lib/actions';
+
+const initialState: State = { message: null, errors: {} };
+// state       → latest return value from createInvoice (errors / messages)
+// formAction  → the WRAPPED version of createInvoice; what you attach to the form
+const [state, formAction] = useActionState(createInvoice, initialState);
+
+return (
+  <form action={formAction}>
+    <input name="amount" />
+    {state.errors?.amount?.map(e => <p key={e}>{e}</p>)}
+    <button type="submit">Create</button>
+  </form>
+);
+```
+
+`useActionState` also returns a third value — `pending: boolean` — usable for disabling the submit button or showing a spinner. Pair with Zod (§31) so the action returns structured field errors your form can render inline without anyone `throw`ing.
 
 ### §34 Progressive enhancement
 A `<form action={serverAction}>` submits as a plain POST if JavaScript fails to load, because Server Actions are real HTTP endpoints under the hood. Stays usable on slow connections, older browsers, and during hydration — you get this for free by not building forms around `onSubmit`.
@@ -247,7 +359,19 @@ A `<form action={serverAction}>` submits as a plain POST if JavaScript fails to 
 For filters, search queries, and pagination, **the URL is your state store**, not React state. Server Components read `searchParams` directly as a prop; Client Components use `useSearchParams()`. Benefits: state is shareable (copy the URL), bookmarkable, survives reload, SSR-friendly (no hydration flicker). Typical flow: user types in a search box → Client Component calls `router.replace(\`?query=\${value}\`)` → the Server Component higher in the tree re-runs with the new `searchParams` and refetches. Keeping filter state in `useState` becomes an anti-pattern in this model.
 
 ### §36 Debouncing
-`use-debounce` wraps the input callback.
+For URL-as-state search, you don't want to hit `router.replace` on every keystroke. `use-debounce` waits until the user stops typing for N ms before running the callback:
+
+```tsx
+'use client';
+import { useDebouncedCallback } from 'use-debounce';
+
+// must be called at the top level of the component (Rules of Hooks)
+const handleSearch = useDebouncedCallback((term: string) => {
+  const params = new URLSearchParams(searchParams);
+  term ? params.set('query', term) : params.delete('query');
+  replace(`${pathname}?${params.toString()}`);
+}, 300); // wait 300ms after the last keystroke
+```
 
 ### §37 Pagination
 Driven by `?page=N` in the URL (same pattern as search). Server Component reads the param, queries with `LIMIT`/`OFFSET`, returns the slice; a client `<Pagination>` component only renders links.
@@ -266,7 +390,21 @@ Downloads fonts at build time and self-hosts them alongside your assets — no r
 Export a `metadata` object (or async `generateMetadata` for dynamic titles) from any `layout.tsx` or `page.tsx`; Next.js merges them into `<head>`. Template pattern: root sets `title: { template: '%s | My App', default: 'My App' }`, child pages set `title: 'Invoices'` → renders `Invoices | My App`.
 
 ### §41 Error handling
-`error.tsx` catches runtime errors in its segment (must be a Client Component; receives `error` + `reset` props). `notFound()` from `next/navigation` triggers the nearest `not-found.tsx`.
+`error.tsx` catches runtime errors in its segment. It **must** be a Client Component and receives `error` + `reset` props (`reset` retries rendering the segment):
+
+```tsx
+'use client';
+export default function Error({ error, reset }: { error: Error; reset: () => void }) {
+  return (
+    <main>
+      <h2>Something went wrong.</h2>
+      <button onClick={reset}>Try again</button>
+    </main>
+  );
+}
+```
+
+`notFound()` from `next/navigation` short-circuits rendering and triggers the nearest `not-found.tsx`. Use it when a dynamic lookup yields nothing (`if (!invoice) notFound()`).
 
 ### §42 Accessibility
 `eslint-plugin-jsx-a11y` catches common a11y mistakes at lint time.
@@ -283,11 +421,23 @@ The config is deliberately **split across two files** because middleware runs on
 
 The `authorized` callback is the access-control policy — return `true` / `false` / `Response` to allow, deny, or redirect. Once this is set up, protecting a route is just putting it under a folder covered by the middleware matcher; calling `auth()` in a Server Component gives you the current session.
 
-### §44 `middleware.ts`
-Runs on every matching request **before** the route handler — ideal for auth checks and redirects. Configure which paths it runs on:
+### §44 `middleware.ts` / `proxy.ts`
+A **network boundary that intercepts requests before they reach your routes.** Lives at the project root (file is named `middleware.ts`; renamed to `proxy.ts` in Next 15.5+). Ideal for lightweight tasks like redirects, header manipulation, and auth gates, running with access to the full Node.js runtime.
+
+Configure which paths it runs on with `matcher`:
+
 ```ts
-export const config = { matcher: ['/dashboard/:path*'] };
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+
+export default NextAuth(authConfig).auth;
+
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+};
 ```
+
+Because it runs on *every* matching request (including navigations between already-rendered pages), keep it cheap — no DB calls, no heavy imports. That's also why auth config is split (§43): the middleware-facing slice must be edge-safe.
 
 ### §45 Credentials + bcrypt
 The `Credentials` provider takes an `authorize(creds)` function where you look up the user and `bcrypt.compare(plain, hash)` against the stored hash. Return the user object on success, `null` on failure.
@@ -346,7 +496,8 @@ This is the single setup step most worth obsessing over — leaks are silent, fa
 | `create-next-app` | §2 |
 | Credentials provider | §45 |
 | CSS Modules | §7 |
-| Data fetching | §26, §27, §28 |
+| Data fetching | §26, §27, §28, §28.5 |
+| Fetch-down pattern | §28.5 |
 | Debouncing | §36 |
 | Deployment | §47 |
 | Dynamic routes | §13 |
@@ -385,6 +536,9 @@ This is the single setup step most worth obsessing over — leaks are silent, fa
 | Suspense | §23 |
 | Tailwind | §6 |
 | TypeScript | §5 |
+| `satisfies` keyword | §5 |
+| `action={fn}` overload | §29, §33 |
+| Form wiring patterns | §33 |
 | URL state | §35 |
 | `useActionState` | §33 |
 | `use client` | §18, §20 |
