@@ -21,13 +21,13 @@
 §1 What Next.js is · §2 `create-next-app` · §3 Folder structure · §4 `package.json` scripts · §5 TypeScript · §6 Tailwind · §7 CSS Modules vs Tailwind · §8 `clsx`
 
 **Part 2 — Routing & Layouts**
-§9 File-system routing · §10 Special files · §11 Nested layouts & partial rendering · §12 Root layout · §13 Dynamic routes · §14 Route groups · §15 `<Link>` · §16 `usePathname` · §17 `useRouter`
+§9 File-system routing · §10 Special files · §10.5 Route Handlers (`route.ts`) · §11 Nested layouts & partial rendering · §12 Root layout · §13 Dynamic routes · §14 Route groups · §15 `<Link>` · §16 `usePathname` · §17 `useRouter`
 
 **Part 3 — Rendering (Server vs Client)**
 §18 Server vs Client Components · §19 What you can't do in Server Components · §20 Cost of `'use client'` · §21 Static vs Dynamic Rendering · §22 Partial Prerendering · §23 Streaming & Suspense · §24 Skeletons · §25 Scoping `loading.tsx`
 
 **Part 4 — Data & Mutations**
-§26 Fetching in Server Components · §27 Postgres on Vercel · §28 Waterfalls vs parallel fetches · §28.5 Move fetches down to components · §29 Server Actions · §30 `revalidatePath` / `revalidateTag` · §31 Zod validation · §32 `redirect` · §33 `useActionState` & form-wiring patterns · §34 Progressive enhancement
+§26 Fetching in Server Components · §27 Postgres on Vercel · §28 Waterfalls vs parallel fetches · §28.5 Move fetches down to components · §29 Server Actions (`'use server'`) · §29.5 `.bind()` for extra args · §30 `revalidatePath` / `revalidateTag` · §31 Zod validation · §32 `redirect` · §33 `useActionState` & form-wiring patterns · §34 Progressive enhancement
 
 **Part 5 — Search, URL State & UX**
 §35 URL search params as state · §36 Debouncing · §37 Pagination
@@ -40,9 +40,6 @@
 
 **Part 8 — Deployment & Security**
 §47 Deploying to Vercel · §48 Environment variables · §49 `.gitignore` for secrets
-
-**Part 9 — Nice-to-knows**
-§50 Route Handlers · §51 `.bind()` for Server Actions
 
 ---
 
@@ -105,6 +102,40 @@ Each special file plays a role that composes with the others:
 | `route.ts` | HTTP endpoint (replaces `pages/api`). |
 
 Mix and match per segment.
+
+### §10.5 Route Handlers (`route.ts`)
+A folder with `route.ts` (instead of `page.tsx`) becomes an **HTTP endpoint** — JSON in, JSON out — rather than a UI page. This replaces the old `pages/api/` directory from the Pages Router.
+
+```ts
+// app/api/invoices/route.ts  → handles /api/invoices
+import { NextRequest } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  const invoices = await sql`SELECT * FROM invoices`;
+  return Response.json(invoices);
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  // validate, insert, etc.
+  return Response.json({ ok: true }, { status: 201 });
+}
+```
+
+Export functions named after HTTP verbs (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`) — Next.js dispatches the matching request to the matching export. Return a `Response` (or use the `Response.json(...)` shortcut).
+
+A folder can have **either `page.tsx` or `route.ts`, not both.** `page.tsx` = frontend route (renders HTML); `route.ts` = backend endpoint (returns JSON).
+
+**Do I need a Route Handler, or a Server Action (§29)?** This is the most common confusion:
+
+| Use… | When you need… |
+|---|---|
+| **Server Action** | A mutation called from *your own* app (your form, your Client Component). Typed end-to-end, no URL, invoked by calling the function. |
+| **Route Handler** | A **stable public URL** consumable by something *outside* your React code: webhooks (Stripe, GitHub), OAuth callbacks, cron jobs, file downloads, image/PDF generation, third-party integrations, your mobile app. |
+
+Rule of thumb: if you're tempted to write `fetch('/api/...')` inside your own Client Component, you probably want a Server Action instead.
+
+Dynamic segments work the same way as pages: `app/api/invoices/[id]/route.ts` handles `/api/invoices/123` and receives `params` (also a Promise in Next 15, see §13).
 
 ### §11 Nested layouts & partial rendering
 Layouts nest by folder. `app/layout.tsx` wraps everything; `app/dashboard/layout.tsx` wraps only `/dashboard/*`. When navigating *within* a shared layout (e.g. `/dashboard` → `/dashboard/invoices`), the layout **does not re-render** — only the inner `page.tsx` swaps. This is **partial rendering**, and it's why sidebars don't flicker between dashboard pages. Practical consequence: state, animations, or expensive setup in a layout persists across its child routes for free.
@@ -171,10 +202,15 @@ You opt a component into the browser by adding `'use client'` at the top of its 
 
 **Mental model:** Server Components for fetching data and rendering structure; Client Components for interactivity. A typical page is a Server Component that fetches data and passes it to a small Client Component for the interactive pieces (search input, dropdown, chart). No API layer is needed between them — the Server Component talks to the DB directly, because it *is* the backend.
 
-**Lifetime framing that made this click:**
-- Server Component code **runs once**, on the server, during the render for that request. The browser never sees it run again — it just receives the output HTML.
-- Client Component code (`'use client'`) also runs during that initial render (to produce HTML), but then **keeps running in the browser** — that's what enables `onClick`, `useState`, `useEffect`, everything interactive.
-- Server Actions (`'use server'`, §29) are the other direction: "give me `'use client'` ergonomics — call a function from an event handler — but have the function actually execute on the server." Under the hood it's a hidden POST endpoint.
+**The three directives — what each one actually marks, and when the code runs:**
+
+| Directive | Marks a… | Where it runs | When it runs |
+|---|---|---|---|
+| *(none — default)* | **component** | server only | **once** per request, during render. Browser receives the output HTML and never executes the code. |
+| `'use client'` | **component** | server for initial HTML, **then the browser** | initial render on server, then **keeps running in the browser** — that's what enables `onClick`, `useState`, `useEffect`. |
+| `'use server'` | **function** (not a component) | server only | **when called** from a form submit or an event handler in a Client Component. Under the hood it's a POST endpoint the browser hits. |
+
+So default Server Components and Server Actions both "run on the server" — but they're different kinds of things: a Server Component is a **piece of UI** rendered once per request; a Server Action is a **callable endpoint** triggered by user interaction. The cleanest mental shortcut: **Server Component = a page; Server Action = a button that does something.** Client Components sit between them and are the only ones the browser actually *executes*.
 
 **Composition rule:** a Server Component can import a Client Component (fine), but a Client Component can't import a Server Component directly — it can only receive one via the `children` prop. That's why you often see structures like `<ClientShell>{serverChildren}</ClientShell>`.
 
@@ -275,12 +311,19 @@ async function Page() {
 
 Benefits: each boundary streams in as its own data resolves (§23), slow queries don't hold up fast ones, and the data requirement lives next to the UI that uses it. This composes with `Promise.all` — use it *inside* a component when that component needs multiple independent things.
 
-### §29 Server Actions
-Server Actions are async functions marked `'use server'` that run on the server but can be called directly from forms or Client Components — **no `/api` route, no client-side `fetch`**:
+### §29 Server Actions (`'use server'`)
 
-```tsx
+> *`'use server'` makes it so that you can do `'use client'` shenanigans but with the code running on the server. The way it does it, is by (under the hood) creating routes (a POST API endpoint) and calling them.*
+
+That's the whole idea. `'use server'` marks **server-side functions that can be called from client-side code** — no `/api` route to write, no `fetch()` wrapper, no request/response plumbing. Put it at the top of a file to mark every exported function as a Server Action, or inside a single function to mark only that one:
+
+```ts
 // app/lib/actions.ts
-'use server';
+'use server';  // marks every export below as a Server Action
+
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+
 export async function createInvoice(formData: FormData) {
   const amount = formData.get('amount');
   await sql`INSERT INTO invoices (amount) VALUES (${amount})`;
@@ -290,20 +333,37 @@ export async function createInvoice(formData: FormData) {
 ```
 
 ```tsx
-// the form
+// the form — in either a Server or Client Component
 <form action={createInvoice}> ... </form>
 ```
 
-⚠️ **The HTML `action` attribute normally takes a URL string.** When you pass a *function* to it, that's React overloading the attribute — the name collision with "Server Actions" is a coincidence. React sees the function, builds `FormData` from the form on submit, and calls it. That's the whole trick.
+⚠️ **The HTML `action` attribute normally takes a URL string.** When you pass a *function* to it, that's React overloading the attribute — the name collision with "Server Actions" is a coincidence. React sees the function, builds `FormData` from the form on submit, and calls it.
 
-Under the hood, Next.js creates a POST endpoint, handles CSRF, and invokes the function. Because it's "just a function," it composes naturally with validation (§31), auth, and rollbacks — write it the way you'd write any server function.
+Two important properties fall out of "it's secretly a POST endpoint":
 
-Two important properties fall out of this design:
-
-1. **Progressive enhancement** (§34) — forms work even if JavaScript hasn't loaded, because the action is a real POST endpoint.
+1. **Progressive enhancement** (§34) — forms work even if JavaScript hasn't loaded.
 2. **No client-server type skew** — you call the function directly, so TypeScript sees the same signature on both sides. Rename a field, the caller breaks at compile time.
 
-⚠️ Server Actions always run on a request, so anything stateful (file uploads, multi-step wizards) still benefits from a client-side orchestrator. And because they mutate, you almost always pair them with `revalidatePath` or `revalidateTag` (§30) to invalidate the cached page that displays the mutated data.
+Server Actions can be imported by **both Client and Server Components**. Convention is to keep them in a dedicated file (`app/lib/actions.ts`) rather than inline inside a Server Component — easier to find, easier to share, easier to audit.
+
+⚠️ Because they mutate, almost always pair with `revalidatePath`/`revalidateTag` (§30) to invalidate the cached page showing the mutated data, and optionally `redirect()` (§32) on success.
+
+### §29.5 `.bind()` — passing extra args to a Server Action
+Server Actions receive `FormData` implicitly from `<form action={...}>`. To pass *additional* values (like the `id` of the record being edited), use `.bind(null, value)` to pre-fill the first parameter:
+
+```ts
+// action signature: extra args first, FormData last
+'use server';
+export async function updateInvoice(id: string, formData: FormData) { ... }
+```
+
+```tsx
+// edit form
+const updateInvoiceWithId = updateInvoice.bind(null, invoice.id);
+return <form action={updateInvoiceWithId}> ... </form>;
+```
+
+`.bind` is plain JavaScript — it returns a new function with the first N arguments locked in. Prefer it over `<input type="hidden" name="id">` for anything authorization-sensitive: a hidden input is trivially editable in DevTools, a bound argument is not part of the submitted form at all.
 
 ### §30 `revalidatePath` / `revalidateTag`
 `revalidatePath('/dashboard/invoices')` invalidates the Next.js cache for that specific route. `revalidateTag('invoices')` invalidates every fetch tagged `'invoices'`. Use the former for route-scoped pages, the latter when the same data feeds many routes.
@@ -470,16 +530,6 @@ This is the single setup step most worth obsessing over — leaks are silent, fa
 
 ---
 
-## Part 9 — Nice-to-knows
-
-### §50 Route Handlers
-`app/api/foo/route.ts` — export `GET`, `POST`, etc.
-
-### §51 `.bind()` for Server Actions
-`action={updateInvoice.bind(null, id)}` passes extra args to the action.
-
----
-
 ## Quick-lookup index
 
 | Keyword | Section |
@@ -487,7 +537,7 @@ This is the single setup step most worth obsessing over — leaks are silent, fa
 | Accessibility | §42 |
 | `authorized` callback | §46 |
 | Authentication | §43–§46 |
-| `.bind()` | §51 |
+| `.bind()` | §29.5 |
 | Cache invalidation | §30 |
 | Client Components | §18, §19, §20 |
 | CLS (layout shift) | §38, §39 |
@@ -525,9 +575,9 @@ This is the single setup step most worth obsessing over — leaks are silent, fa
 | `revalidatePath` / `revalidateTag` | §30 |
 | Root layout | §12 |
 | Route groups | §14, §25 |
-| Route Handlers | §50 |
+| Route Handlers | §10.5 |
 | `searchParams` | §35 |
-| Server Actions | §29, §51 |
+| Server Actions | §29, §29.5 |
 | Server Components | §18, §19, §26 |
 | Skeletons | §24 |
 | Special files | §10 |
