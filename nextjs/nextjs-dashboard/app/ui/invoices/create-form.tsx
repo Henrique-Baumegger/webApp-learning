@@ -17,12 +17,38 @@ import { useActionState } from 'react';
 
 export default function Form({ customers }: { customers: CustomerField[] }) {
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Two ways to wire a server action to a form:
+  //
+  //   (A) <form action={serverAction}>
+  //       Fire-and-forget. React builds FormData, calls the action, done.
+  //       The action's RETURN VALUE is discarded.
+  //       Use when: action always redirects or has nothing to report back.
+  //
+  //   (B) useActionState(serverAction, initial) → [state, wrappedAction]
+  //       Wraps the action so its RETURN VALUE becomes `state` on the client.
+  //       The component re-renders → you can display errors / messages.
+  //       Use when: action can fail validation or needs to reply with data.
+  //
+  // We use (B) here because createInvoice returns Zod validation errors
+  // when the form input is invalid — and we want to show them to the user.
+  // ─────────────────────────────────────────────────────────────────────────
 
+  // `initialState` = what `state` equals BEFORE the form has ever been submitted.
   const initialState: State = { message: null, errors: {} }
+
+  // state       → latest return value from createInvoice (errors / messages)
+  // formAction  → the WRAPPED version of createInvoice; attach it to <form action={...}>
+  //               (calling it triggers the server action AND captures its return value)
   const [state, formAction] = useActionState(createInvoice, initialState);
 
   return (
-    <form action={formAction}> {/* The "action" for the form attribute is a coincidence */}
+    // Note: the HTML `action` attribute here is unrelated to "Server Actions" —
+    // the name collision is just a coincidence. 
+    // React overloads it so that when
+    // you pass a function (instead of a URL string), it runs that function with
+    // the form's FormData on submit.
+    <form action={formAction}>
 
 
       <div className="rounded-md bg-gray-50 p-4 md:p-6">
