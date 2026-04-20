@@ -6,7 +6,12 @@ import { lusitana } from '@/app/ui/fonts';
 import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
 import { Suspense } from 'react';
 import { fetchInvoicesPages } from '@/app/lib/data';
+import { Metadata } from 'next';
 
+// Adding metadata to a specific page
+export const metadata: Metadata = {
+  title: 'Invoices | Acme Dashboard',
+};
  
 
 // Page components accept a prop called searchParams
