@@ -21,3 +21,16 @@ export default function RootLayout( { children }: { children: React.ReactNode })
     </html>
   );
 }
+
+
+
+// You can also include a metadata object from any layout.js 
+// or page.js file to add additional page information like title and description. 
+// Any metadata in layout.js will be inherited by all pages that use it.
+import { Metadata } from 'next';
+ 
+export const metadata: Metadata = {
+  title: 'Acme Dashboard',
+  description: 'The official Next.js Course Dashboard, built with App Router.',
+  metadataBase: new URL('https://next-learn-dashboard.vercel.sh'),
+};
